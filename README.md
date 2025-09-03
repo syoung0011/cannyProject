@@ -1,2 +1,2 @@
 # cannyProject
-edge detection
+基于传统Canny边缘检测算法的改进及其在文档图像边界定位中的应用
