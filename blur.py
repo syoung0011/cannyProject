@@ -31,3 +31,15 @@ def gaussBlus(img, sigma_list=[1, 3], weight_list=[0.3, 0.7]):
 
 def otherBlur():
     pass
+    # 双边滤波（保边）
+    # cv2.bilateralFilter(
+    #     src=img,
+    #     d=5,       # 空间核直径（=2*半径+1）
+    #     sigmaColor=50,  # 灰度差异权重衰减系数（越大越保边）
+    #     sigmaSpace=50                  # 空间距离权重衰减系数（固定50即可）
+    # )
+'''
+bilateral_kernel_size: 双边滤波空间核大小（奇数，默认5×5）---d
+bilateral_sigma_color: 双边滤波灰度核标准差（默认50，控制保边强度）---sigmaColor
+sigmaSpace 固定50
+'''
