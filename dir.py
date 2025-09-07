@@ -54,19 +54,35 @@ def scharrDir(img,scharr_scale=1,decay_factor=0.7):
     top2_bins = np.argsort(hist)[-2:] # 索引为0~17，对应0~170°区间（如[8,9]对应80~100°）
     top2_angles = [(bins[i]+bins[i+1])/2 for i in top2_bins] # 优势方向角度范围
 
-    # 构建掩膜：优势方向梯度保留，非优势方向衰减
-    mask = np.zeros_like(grad_mag, dtype=np.float32)
-    for i in top2_bins:
-        start = bins[i]
-        end = bins[i+1]
-        mask[(grad_dir >= start) & (grad_dir < end)] = 1.0 # 优势方向标记为1
+    # -------------------------- 新增：动态衰减逻辑 --------------------------
+    max_angle_diff = 90.0 # 最大有效角度差（0~90°，超过90°取补角更小）
 
-    # 应用衰减：非优势方向梯度幅值 × decay_factor
-    adaptive_grad_mag = grad_mag * (mask + (1 - mask) * decay_factor)
+    # 计算每个像素方向与两个主方向的最小角度差（考虑0~180°循环特性）
+    diffs = []
+    for angle in top2_angles:
+        # 计算原始角度差（可能超过90°）
+        raw_diff = np.abs(grad_dir - angle)
+        # 取最小角度差（如170°与10°的差应为20°，而非160°）
+        min_diff = np.minimum(raw_diff, 180 - raw_diff)
+        diffs.append(min_diff)
+    diffs = np.stack(diffs, axis=0) # 合并为[2, H, W]数组
+    min_diff_per_pixel = np.min(diffs, axis=0) # 每个像素与最近主方向的角度差（形状[H, W]）
+
+    # 动态生成衰减系数：角度差越小，衰减越弱（线性衰减示例）
+    # 公式：decay_coeff = decay_factor + (1 - decay_factor) * (1 - (min_diff / max_angle_diff))
+    # 当min_diff=0°时，decay_coeff=1（完全保留）；当min_diff=90°时，decay_coeff=decay_factor（最大衰减）
+    
+    decay_coeff = decay_factor + (1 - decay_factor) * (1 - (min_diff_per_pixel / max_angle_diff))
+    decay_coeff = np.clip(decay_coeff, decay_factor, 1.0) # 限制衰减系数范围
+
+    # 应用动态衰减：梯度幅值 × 衰减系数
+    adaptive_grad_mag = grad_mag * decay_coeff
+    # -----------------------------------------------------------------------
     return adaptive_grad_mag,grad_dir,grad_mag
 
 if __name__ == '__main__':
     img=cv2.imread('01.png')
+    # img=fc.imResize(img)
     gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
     dir1,ang,mag=scharrDir(gray,1,0.1)
     pic=dir(mag,ang,2,0.1)
